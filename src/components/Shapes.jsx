@@ -41,9 +41,10 @@ const getFaceCenter = (vertices, face) => {
 };
 
 // Base 3D Shape Component  
-const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rotation = { x: 15, y: 25 } }) => {
+const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rotation = { x: 15, y: 25 }, onClick, className = '' }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [currentRotation, setCurrentRotation] = useState(rotation);
+  const [scale, setScale] = useState(1);
   const animationRef = useRef();
   const startTimeRef = useRef();
 
@@ -84,10 +85,12 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rota
 
   const handleMouseEnter = () => {
     setIsHovered(true);
+    setScale(1.1);
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    setScale(1);
   };
 
   const projectedVertices = shapeData.vertices.map(vertex => project(vertex, currentRotation));
@@ -109,9 +112,11 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rota
       width={width} 
       height={height} 
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-full select-none cursor-pointer hover:cursor-pointer transition-transform"
+      className={`w-full h-full select-none cursor-pointer hover:cursor-pointer transition-transform duration-200 ease-in-out ${className}`}
+      style={{ transform: `scale(${scale})` }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={onClick}
     >
        {sortedFaces.map(({ vertices, index, showStroke = true, isEdgeFace = false }) => (
          <polygon
@@ -141,7 +146,7 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rota
   );
 };
 
-export const Cube = () => {
+export const Cube = ({ onClick, className }) => {
   const shapeData = {
     vertices: [
       [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5],
@@ -171,10 +176,10 @@ export const Cube = () => {
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
-  return <Shape3D shapeData={shapeData} color="#0ea5e9" rotation={selectedRotation} />;
+  return <Shape3D shapeData={shapeData} color="#0ea5e9" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 
-export const RectangularPrism = () => {
+export const RectangularPrism = ({ onClick, className }) => {
   const shapeData = {
     vertices: [
       [-0.7, -0.4, -0.3], [0.7, -0.4, -0.3], [0.7, 0.4, -0.3], [-0.7, 0.4, -0.3],
@@ -204,10 +209,10 @@ export const RectangularPrism = () => {
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
-  return <Shape3D shapeData={shapeData} color="#48bb78" rotation={selectedRotation} />;
+  return <Shape3D shapeData={shapeData} color="#48bb78" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 
-export const TriangularPrism = () => {
+export const TriangularPrism = ({ onClick, className }) => {
   const shapeData = {
     vertices: [
       [0, 0.6, -0.5], [-0.5, -0.3, -0.5], [0.5, -0.3, -0.5],
@@ -236,10 +241,10 @@ export const TriangularPrism = () => {
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
-  return <Shape3D shapeData={shapeData} color="#ed8936" rotation={selectedRotation} />;
+  return <Shape3D shapeData={shapeData} color="#ed8936" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 
-export const Cylinder = () => {
+export const Cylinder = ({ onClick, className }) => {
   const createCylinderVertices = (radius = 0.5, height = 1, segments = 16) => {
     const vertices = [];
     const faces = [];
@@ -322,10 +327,10 @@ export const Cylinder = () => {
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
-  return <Shape3D shapeData={shapeData} color="#ed64a6" rotation={selectedRotation} />;
+  return <Shape3D shapeData={shapeData} color="#ed64a6" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 
-export const Cone = () => {
+export const Cone = ({ onClick, className }) => {
   const createConeVertices = (radius = 0.5, height = 1, segments = 16) => {
     const vertices = [];
     const faces = [];
@@ -394,10 +399,10 @@ export const Cone = () => {
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
-  return <Shape3D shapeData={shapeData} color="#667eea" rotation={selectedRotation} />;
+  return <Shape3D shapeData={shapeData} color="#667eea" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 
-export const Sphere = () => {
+export const Sphere = ({ onClick, className }) => {
   const createSphereVertices = (radius = 0.5, latSegments = 8, lonSegments = 12) => {
     const vertices = [];
     const faces = [];
@@ -447,10 +452,10 @@ export const Sphere = () => {
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
-  return <Shape3D shapeData={shapeData} color="#d69e2e" rotation={selectedRotation} />;
+  return <Shape3D shapeData={shapeData} color="#d69e2e" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 
-export const Pyramid = () => {
+export const Pyramid = ({ onClick, className }) => {
   const shapeData = {
     vertices: [
       [0, 0.7, 0],           // apex
@@ -481,6 +486,6 @@ export const Pyramid = () => {
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
-  return <Shape3D shapeData={shapeData} color="#dc2626" rotation={selectedRotation} />;
+  return <Shape3D shapeData={shapeData} color="#dc2626" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 

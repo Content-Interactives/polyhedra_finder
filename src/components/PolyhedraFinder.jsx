@@ -2,11 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { Container } from './ui/reused-ui/Container.jsx'
 import { Cube, RectangularPrism, TriangularPrism, Cylinder, Cone, Sphere, Pyramid } from './Shapes.jsx'
+import './PolyhedraFinder.css'
 
 const PolyhedraFinder = () => {
     // State Management
     const [answer, setAnswer] = useState('cube');
     const [displayedShapes, setDisplayedShapes] = useState([]);
+    const [clickedCorrectShape, setClickedCorrectShape] = useState(null);
+    const autoResetTimeoutRef = useRef(null);
 
     // Shape mapping with names
     const shapeLibrary = [
@@ -36,17 +39,70 @@ const PolyhedraFinder = () => {
     }
 
     const handleReset = () => {
+        // Clear any existing auto-reset timeout
+        if (autoResetTimeoutRef.current) {
+            clearTimeout(autoResetTimeoutRef.current);
+            autoResetTimeoutRef.current = null;
+        }
+        
+        setClickedCorrectShape(null);
         generateShapes();
     };
 
     useEffect(() => {
         generateShapes();
+        
+        // Cleanup timeout on component unmount
+        return () => {
+            if (autoResetTimeoutRef.current) {
+                clearTimeout(autoResetTimeoutRef.current);
+            }
+        };
     }, []);
+
+    const handleShapeClick = (shape) => {
+        if (shape.name === answer) {
+            // Clear any existing auto-reset timeout
+            if (autoResetTimeoutRef.current) {
+                clearTimeout(autoResetTimeoutRef.current);
+            }
+            
+            // Set the clicked correct shape to apply hideShapes class
+            setClickedCorrectShape(shape.name);
+            
+            // Fire confetti from multiple positions for better visibility
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.5, x: 0.5 }
+            });
+            
+            // Add a second burst for extra celebration
+            setTimeout(() => {
+                confetti({
+                    particleCount: 50,
+                    spread: 60,
+                    origin: { y: 0.55, x: 0.3 }
+                });
+                confetti({
+                    particleCount: 50,
+                    spread: 60,
+                    origin: { y: 0.55, x: 0.7 }
+                });
+            }, 200);
+            
+            // Auto-reset after 3 seconds
+            autoResetTimeoutRef.current = setTimeout(() => {
+                setClickedCorrectShape(null);
+                generateShapes();
+                autoResetTimeoutRef.current = null;
+            }, 3000);
+        }
+    }
     
 	return (
         <Container
             text="Polyhedra Finder" 
-            showResetButton={true}
             onReset={handleReset}
             borderColor="#FF7B00"
             showSoundButton={true}
@@ -61,15 +117,29 @@ const PolyhedraFinder = () => {
                 <div className='grid grid-cols-2 justify-items-center'>
                     {displayedShapes.map((shape, index) => {
                         const ShapeComponent = shape.component;
-                        return <ShapeComponent key={index} />;
+                        const shouldHide = clickedCorrectShape && shape.name !== clickedCorrectShape;
+                        return (
+                            <ShapeComponent 
+                                key={index} 
+                                onClick={() => handleShapeClick(shape)}
+                                className={shouldHide ? 'hideShapes' : ''}
+                            />
+                        );
                     })}
                 </div>
             </div>
 
             {/* Prompt */}
-            <div className='pb-5 font-bold text-lg text-center'>
-                Which of these shapes is a <span className='text-blue-600'>{answer}</span>?
-            </div>
+            {!clickedCorrectShape && (
+                <div className='w-[95%] pb-5 font-bold text-lg text-center'>
+                    Which of these shapes is a <span className='text-[#FF7B00]'>{answer}</span>?
+                </div>
+            )}
+            {clickedCorrectShape && (
+                <div className='w-[95%] pb-5 font-bold text-lg text-center'>
+                    That's correct! That's a <span className='text-green-700'>{answer}</span>!
+                </div>
+            )}
         </Container>
 )
 };
