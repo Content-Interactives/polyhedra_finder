@@ -6,16 +6,48 @@ import { Cube, RectangularPrism, TriangularPrism, Cylinder, Cone, Sphere, Pyrami
 const PolyhedraFinder = () => {
     // State Management
     const [answer, setAnswer] = useState('cube');
+    const [displayedShapes, setDisplayedShapes] = useState([]);
+
+    // Shape mapping with names
+    const shapeLibrary = [
+        { component: Cube, name: 'cube' },
+        { component: RectangularPrism, name: 'rectangular prism' },
+        { component: TriangularPrism, name: 'triangular prism' },
+        { component: Cylinder, name: 'cylinder' },
+        { component: Cone, name: 'cone' },
+        { component: Sphere, name: 'sphere' },
+        { component: Pyramid, name: 'pyramid' }
+    ];
 
     // Functions
     const generateShapes = () => {
+        // Create a copy of the shape library and shuffle it
+        const shuffledShapes = [...shapeLibrary].sort(() => Math.random() - 0.5);
         
+        // Take the first 4 unique shapes
+        const selectedShapes = shuffledShapes.slice(0, 4);
+
+        // Set the answer to one of the selected shapes
+        const answerShape = selectedShapes[Math.floor(Math.random() * selectedShapes.length)];
+        setAnswer(answerShape.name);
+        setDisplayedShapes(selectedShapes);
+
+        return selectedShapes;
     }
+
+    const handleReset = () => {
+        generateShapes();
+    };
+
+    useEffect(() => {
+        generateShapes();
+    }, []);
     
 	return (
         <Container
             text="Polyhedra Finder" 
-            showResetButton={false}
+            showResetButton={true}
+            onReset={handleReset}
             borderColor="#FF7B00"
             showSoundButton={true}
         >
@@ -27,10 +59,10 @@ const PolyhedraFinder = () => {
             {/* Main Content */}
             <div className='flex-grow p-4'>
                 <div className='grid grid-cols-2 justify-items-center'>
-                    <Cube />
-                    <RectangularPrism />
-                    <Cylinder />
-                    <Sphere />
+                    {displayedShapes.map((shape, index) => {
+                        const ShapeComponent = shape.component;
+                        return <ShapeComponent key={index} />;
+                    })}
                 </div>
             </div>
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // Utility functions for 3D rendering
 const toRadians = (degrees) => (degrees * Math.PI) / 180;
@@ -41,19 +41,66 @@ const getFaceCenter = (vertices, face) => {
 };
 
 // Base 3D Shape Component  
-const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', hideInternalEdges = false, showCircularOutline = false }) => {
-  // Fixed rotation for consistent shape presentation
-  const rotation = { x: 15, y: 25 };
+const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rotation = { x: 15, y: 25 } }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [currentRotation, setCurrentRotation] = useState(rotation);
+  const animationRef = useRef();
+  const startTimeRef = useRef();
 
-  const projectedVertices = shapeData.vertices.map(vertex => project(vertex, rotation));
+  useEffect(() => {
+    if (isHovered) {
+      const animate = (timestamp) => {
+        if (!startTimeRef.current) {
+          startTimeRef.current = timestamp;
+        }
+        
+        const elapsed = timestamp - startTimeRef.current;
+        const rotationSpeed = 1.06; // Slow rotation speed
+        
+        setCurrentRotation(prev => ({
+          x: prev.x,
+          y: prev.y + rotationSpeed
+        }));
+        
+        animationRef.current = requestAnimationFrame(animate);
+      };
+      
+      startTimeRef.current = null;
+      animationRef.current = requestAnimationFrame(animate);
+    } else {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      startTimeRef.current = null;
+      // Don't reset position - keep current rotation
+    }
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isHovered]);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  const projectedVertices = shapeData.vertices.map(vertex => project(vertex, currentRotation));
 
   const sortedFaces = [...shapeData.faces].map((face, index) => ({
-    vertices: face,
-    center: getFaceCenter(shapeData.vertices, face),
-    index
+    vertices: Array.isArray(face) ? face : face.vertices || face,
+    center: getFaceCenter(shapeData.vertices, Array.isArray(face) ? face : face.vertices || face),
+    index,
+    showStroke: Array.isArray(face) ? true : (face.showStroke !== false),
+    isEdgeFace: Array.isArray(face) ? false : (face.isEdgeFace || false)
   })).sort((a, b) => {
-    const centerA = rotatePoint(a.center, rotation)[2];
-    const centerB = rotatePoint(b.center, rotation)[2];
+    const centerA = rotatePoint(a.center, currentRotation)[2];
+    const centerB = rotatePoint(b.center, currentRotation)[2];
     return centerB - centerA;
   });
 
@@ -62,39 +109,29 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', hide
       width={width} 
       height={height} 
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-full select-none"
+      className="w-full h-full select-none cursor-pointer hover:cursor-pointer transition-transform"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-       {/* Render outline edges first so faces can cover them */}
-       {hideInternalEdges && shapeData.outlineEdges && shapeData.outlineEdges.map((edge, index) => (
-         <line
-           key={`outline-${index}`}
-           x1={projectedVertices[edge[0]].x}
-           y1={projectedVertices[edge[0]].y}
-           x2={projectedVertices[edge[1]].x}
-           y2={projectedVertices[edge[1]].y}
-           stroke="black"
-           strokeWidth="2"
-         />
-       ))}
-       
-       {sortedFaces.map(({ vertices, index }) => (
+       {sortedFaces.map(({ vertices, index, showStroke = true, isEdgeFace = false }) => (
          <polygon
            key={`face-${index}`}
            points={vertices
              .map(v => `${projectedVertices[v].x},${projectedVertices[v].y}`)
              .join(' ')}
-           fill={color}
-           fillOpacity="0.7"
-           stroke={hideInternalEdges ? "none" : "black"}
+           fill={isEdgeFace ? "black" : color}
+           fillOpacity={isEdgeFace ? 1.0 : 0.7}
+           stroke={showStroke ? "black" : "none"}
            strokeWidth="2"
          />
        ))}
        
-       {showCircularOutline && (
+       {/* Add circular outline for sphere */}
+       {shapeData.isSpherical && (
          <circle
            cx={100}
            cy={75}
-           r={45 * (4 / (4 + 0))}
+           r={45}
            fill="none"
            stroke="black"
            strokeWidth="2"
@@ -125,7 +162,16 @@ export const Cube = () => {
     ]
   };
 
-  return <Shape3D shapeData={shapeData} color="#0ea5e9" />;
+  // 4 different viewing angles that clearly show cube form
+  const rotations = [
+    { x: 15, y: 25 },   // corner view
+    { x: 10, y: 45 },   // angled face view
+    { x: 20, y: 10 },   // edge view
+    { x: 25, y: 35 }    // different corner
+  ];
+  const selectedRotation = rotations[Math.floor(Math.random() * 4)];
+
+  return <Shape3D shapeData={shapeData} color="#0ea5e9" rotation={selectedRotation} />;
 };
 
 export const RectangularPrism = () => {
@@ -149,7 +195,16 @@ export const RectangularPrism = () => {
     ]
   };
 
-  return <Shape3D shapeData={shapeData} color="#48bb78" />;
+  // 4 angles showing rectangular (non-square) proportions clearly
+  const rotations = [
+    { x: 12, y: 30 },   // shows length difference
+    { x: 18, y: 15 },   // side view showing width
+    { x: 8, y: 40 },    // angled to show depth
+    { x: 22, y: 20 }    // corner view
+  ];
+  const selectedRotation = rotations[Math.floor(Math.random() * 4)];
+
+  return <Shape3D shapeData={shapeData} color="#48bb78" rotation={selectedRotation} />;
 };
 
 export const TriangularPrism = () => {
@@ -172,14 +227,22 @@ export const TriangularPrism = () => {
     ]
   };
 
-  return <Shape3D shapeData={shapeData} color="#ed8936" />;
+  // 4 angles showing triangular cross-section clearly
+  const rotations = [
+    { x: 15, y: 0 },    // front view showing triangle
+    { x: 10, y: 30 },   // angled to show triangle and depth
+    { x: 20, y: 60 },   // side angle
+    { x: 5, y: 15 }     // slight angle showing form
+  ];
+  const selectedRotation = rotations[Math.floor(Math.random() * 4)];
+
+  return <Shape3D shapeData={shapeData} color="#ed8936" rotation={selectedRotation} />;
 };
 
 export const Cylinder = () => {
   const createCylinderVertices = (radius = 0.5, height = 1, segments = 16) => {
     const vertices = [];
     const faces = [];
-    const outlineEdges = [];
     
     // Create top and bottom circles
     for (let i = 0; i < segments; i++) {
@@ -198,42 +261,74 @@ export const Cylinder = () => {
     const topCenter = segments * 2;
     const bottomCenter = segments * 2 + 1;
     
-    // Create side faces
+    // Create additional vertices for thin edge outlines
+    const edgeWidth = 0.04; // Thicker edge width for better visibility
     for (let i = 0; i < segments; i++) {
-      const next = (i + 1) % segments;
-      faces.push([i*2, next*2, next*2+1, i*2+1]);
+      const angle = (i / segments) * 2 * Math.PI;
+      const x = radius * Math.cos(angle);
+      const z = radius * Math.sin(angle);
+      
+      // Inner edge vertices (slightly smaller radius)
+      vertices.push([(radius - edgeWidth) * Math.cos(angle), height/2, (radius - edgeWidth) * Math.sin(angle)]);  // top inner
+      vertices.push([(radius - edgeWidth) * Math.cos(angle), -height/2, (radius - edgeWidth) * Math.sin(angle)]); // bottom inner
     }
     
-    // Create top and bottom faces
+    const innerStart = segments * 2 + 2;
+    
+    // Create side faces (no strokes - just colored surface)
     for (let i = 0; i < segments; i++) {
       const next = (i + 1) % segments;
-      faces.push([topCenter, next*2, i*2]);
-      faces.push([bottomCenter, i*2+1, next*2+1]);
+      faces.push({ vertices: [i*2, next*2, next*2+1, i*2+1], showStroke: false });
     }
     
-    // Create outline edges (only top and bottom circles)
+    // Create top and bottom faces (no strokes - these are internal triangulation)
     for (let i = 0; i < segments; i++) {
       const next = (i + 1) % segments;
-      // Top circle outline
-      outlineEdges.push([i*2, next*2]);
-      // Bottom circle outline  
-      outlineEdges.push([i*2+1, next*2+1]);
+      faces.push({ vertices: [topCenter, next*2, i*2], showStroke: false });
+      faces.push({ vertices: [bottomCenter, i*2+1, next*2+1], showStroke: false });
     }
     
-    return { vertices, faces, outlineEdges };
+    // Create thin edge faces for circular outlines
+    for (let i = 0; i < segments; i++) {
+      const next = (i + 1) % segments;
+      
+      // Top circular edge (thin rectangle between outer and inner circle)
+      faces.push({ 
+        vertices: [i*2, next*2, innerStart + next*2, innerStart + i*2], 
+        showStroke: false, 
+        isEdgeFace: true 
+      });
+      
+      // Bottom circular edge  
+      faces.push({ 
+        vertices: [i*2+1, innerStart + i*2+1, innerStart + next*2+1, next*2+1], 
+        showStroke: false, 
+        isEdgeFace: true 
+      });
+    }
+    
+    return { vertices, faces };
   };
 
-  const { vertices, faces, outlineEdges } = createCylinderVertices();
-  const shapeData = { vertices, faces, edges: [], outlineEdges };
+  const { vertices, faces } = createCylinderVertices();
+  const shapeData = { vertices, faces, edges: [] };
 
-  return <Shape3D shapeData={shapeData} hideInternalEdges={true} color="#ed64a6" />;
+  // 4 angles showing cylindrical form with circular ends
+  const rotations = [
+    { x: 10, y: 25 },   // slight angle showing circles and height
+    { x: 20, y: 0 },    // side view showing cylinder profile
+    { x: 5, y: 45 },    // angled view
+    { x: 15, y: 10 }    // showing circular top clearly
+  ];
+  const selectedRotation = rotations[Math.floor(Math.random() * 4)];
+
+  return <Shape3D shapeData={shapeData} color="#ed64a6" rotation={selectedRotation} />;
 };
 
 export const Cone = () => {
   const createConeVertices = (radius = 0.5, height = 1, segments = 16) => {
     const vertices = [];
     const faces = [];
-    const outlineEdges = [];
     
     // Create base circle
     for (let i = 0; i < segments; i++) {
@@ -250,39 +345,62 @@ export const Cone = () => {
     const apex = segments;
     const baseCenter = segments + 1;
     
-    // Create side faces
+    // Create additional vertices for thin edge outline
+    const edgeWidth = 0.04; // Thicker edge width for better visibility
     for (let i = 0; i < segments; i++) {
-      const next = (i + 1) % segments;
-      faces.push([apex, next, i]);
+      const angle = (i / segments) * 2 * Math.PI;
+      // Inner edge vertices (slightly smaller radius) at base level
+      vertices.push([(radius - edgeWidth) * Math.cos(angle), -height/2, (radius - edgeWidth) * Math.sin(angle)]);
     }
     
-    // Create base face
+    const innerStart = segments + 2;
+    
+    // Create side faces (no strokes - just colored surface)
     for (let i = 0; i < segments; i++) {
       const next = (i + 1) % segments;
-      faces.push([baseCenter, i, next]);
+      faces.push({ vertices: [apex, next, i], showStroke: false });
     }
     
-    // Create outline edges (only base circle)
+    // Create base face (no strokes - these are internal triangulation)
     for (let i = 0; i < segments; i++) {
       const next = (i + 1) % segments;
-      // Base circle outline
-      outlineEdges.push([i, next]);
+      faces.push({ vertices: [baseCenter, i, next], showStroke: false });
     }
     
-    return { vertices, faces, outlineEdges };
+    // Create thin edge faces for circular base outline
+    for (let i = 0; i < segments; i++) {
+      const next = (i + 1) % segments;
+      
+      // Base circular edge (thin rectangle between outer and inner circle)
+      faces.push({ 
+        vertices: [i, innerStart + i, innerStart + next, next], 
+        showStroke: false, 
+        isEdgeFace: true 
+      });
+    }
+    
+    return { vertices, faces };
   };
 
-  const { vertices, faces, outlineEdges } = createConeVertices();
-  const shapeData = { vertices, faces, edges: [], outlineEdges };
+  const { vertices, faces } = createConeVertices();
+  const shapeData = { vertices, faces, edges: [] };
 
-  return <Shape3D shapeData={shapeData} hideInternalEdges={true} color="#667eea" />;
+  // 4 angles showing cone form with circular base and apex
+  const rotations = [
+    { x: 15, y: 20 },   // showing base circle and point
+    { x: 10, y: 40 },   // angled view of cone
+    { x: 25, y: 10 },   // side profile
+    { x: 8, y: 30 }     // clear base and apex view
+  ];
+  const selectedRotation = rotations[Math.floor(Math.random() * 4)];
+
+  return <Shape3D shapeData={shapeData} color="#667eea" rotation={selectedRotation} />;
 };
 
 export const Sphere = () => {
   const createSphereVertices = (radius = 0.5, latSegments = 8, lonSegments = 12) => {
     const vertices = [];
     const faces = [];
-    const outlineEdges = [];
     
     // Create vertices
     for (let lat = 0; lat <= latSegments; lat++) {
@@ -303,26 +421,33 @@ export const Sphere = () => {
       }
     }
     
-    // Create faces
+    // Create faces (no strokes - would create too much mesh clutter)
     for (let lat = 0; lat < latSegments; lat++) {
       for (let lon = 0; lon < lonSegments; lon++) {
         const first = (lat * (lonSegments + 1)) + lon;
         const second = first + lonSegments + 1;
         
-        faces.push([first, second, first + 1]);
-        faces.push([second, second + 1, first + 1]);
+        faces.push({ vertices: [first, second, first + 1], showStroke: false });
+        faces.push({ vertices: [second, second + 1, first + 1], showStroke: false });
       }
     }
     
-    // Sphere has no outline edges - completely smooth
-    
-    return { vertices, faces, outlineEdges };
+    return { vertices, faces };
   };
 
-  const { vertices, faces, outlineEdges } = createSphereVertices();
-  const shapeData = { vertices, faces, edges: [], outlineEdges };
+  const { vertices, faces } = createSphereVertices();
+  const shapeData = { vertices, faces, edges: [], isSpherical: true };
 
-  return <Shape3D shapeData={shapeData} hideInternalEdges={true} showCircularOutline={true} color="#d69e2e" />;
+  // 4 different angles (sphere looks the same but adds variety)
+  const rotations = [
+    { x: 15, y: 25 },   // standard angle
+    { x: 10, y: 35 },   // different rotation
+    { x: 20, y: 15 },   // another angle
+    { x: 12, y: 40 }    // varied position
+  ];
+  const selectedRotation = rotations[Math.floor(Math.random() * 4)];
+
+  return <Shape3D shapeData={shapeData} color="#d69e2e" rotation={selectedRotation} />;
 };
 
 export const Pyramid = () => {
@@ -347,6 +472,15 @@ export const Pyramid = () => {
     ]
   };
 
-  return <Shape3D shapeData={shapeData} color="#dc2626" />;
+  // 4 angles showing pyramid form with square base and apex
+  const rotations = [
+    { x: 18, y: 30 },   // showing base and triangular faces
+    { x: 12, y: 45 },   // angled to show square base
+    { x: 25, y: 15 },   // side view showing height
+    { x: 10, y: 20 }    // clear pyramid form
+  ];
+  const selectedRotation = rotations[Math.floor(Math.random() * 4)];
+
+  return <Shape3D shapeData={shapeData} color="#dc2626" rotation={selectedRotation} />;
 };
 
