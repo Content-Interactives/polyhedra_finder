@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { Container } from './ui/reused-ui/Container.jsx'
-import { Cube, RectangularPrism, TriangularPrism, Cylinder, Cone, Sphere, Pyramid } from './Shapes.jsx'
+import { generateShapesSet } from './Shapes.jsx'
 import './PolyhedraFinder.css'
 
 const PolyhedraFinder = () => {
@@ -9,33 +9,18 @@ const PolyhedraFinder = () => {
     const [answer, setAnswer] = useState('cube');
     const [displayedShapes, setDisplayedShapes] = useState([]);
     const [clickedCorrectShape, setClickedCorrectShape] = useState(null);
+    const [shakingShape, setShakingShape] = useState(null);
+    const [generation, setGeneration] = useState(0);
     const autoResetTimeoutRef = useRef(null);
-
-    // Shape mapping with names
-    const shapeLibrary = [
-        { component: Cube, name: 'cube' },
-        { component: RectangularPrism, name: 'rectangular prism' },
-        { component: TriangularPrism, name: 'triangular prism' },
-        { component: Cylinder, name: 'cylinder' },
-        { component: Cone, name: 'cone' },
-        { component: Sphere, name: 'sphere' },
-        { component: Pyramid, name: 'pyramid' }
-    ];
 
     // Functions
     const generateShapes = () => {
-        // Create a copy of the shape library and shuffle it
-        const shuffledShapes = [...shapeLibrary].sort(() => Math.random() - 0.5);
-        
-        // Take the first 4 unique shapes
-        const selectedShapes = shuffledShapes.slice(0, 4);
-
-        // Set the answer to one of the selected shapes
-        const answerShape = selectedShapes[Math.floor(Math.random() * selectedShapes.length)];
-        setAnswer(answerShape.name);
-        setDisplayedShapes(selectedShapes);
-
-        return selectedShapes;
+        const { shapes, answer } = generateShapesSet();
+        setAnswer(answer);
+        setDisplayedShapes(shapes);
+        setShakingShape(null);
+        setGeneration(prev => prev + 1);
+        return shapes;
     }
 
     const handleReset = () => {
@@ -60,7 +45,11 @@ const PolyhedraFinder = () => {
         };
     }, []);
 
-    const handleShapeClick = (shape) => {
+    const handleShapeClick = (shape, controls) => {
+        // If the correct shape has already been selected, ignore further clicks on it
+        if (clickedCorrectShape && shape.name === clickedCorrectShape) {
+            return;
+        }
         if (shape.name === answer) {
             // Clear any existing auto-reset timeout
             if (autoResetTimeoutRef.current) {
@@ -97,6 +86,18 @@ const PolyhedraFinder = () => {
                 generateShapes();
                 autoResetTimeoutRef.current = null;
             }, 3000);
+        } else {
+            // Wrong selection: spin only for 1 second, then stop
+            setTimeout(() => {
+                if (controls && controls.stopPersistentSpin) {
+                    controls.stopPersistentSpin();
+                }
+            }, 1000);
+            // Trigger a brief shake animation
+            setShakingShape(shape.name);
+            setTimeout(() => {
+                setShakingShape(null);
+            }, 500);
         }
     }
     
@@ -113,16 +114,16 @@ const PolyhedraFinder = () => {
             </div>
 
             {/* Main Content */}
-            <div className='flex-grow p-4'>
+            <div className='flex-grow p-4 pt-0 pb-0'>
                 <div className='grid grid-cols-2 justify-items-center'>
                     {displayedShapes.map((shape, index) => {
                         const ShapeComponent = shape.component;
                         const shouldHide = clickedCorrectShape && shape.name !== clickedCorrectShape;
                         return (
                             <ShapeComponent 
-                                key={index} 
-                                onClick={() => handleShapeClick(shape)}
-                                className={shouldHide ? 'hideShapes' : ''}
+                                key={`${generation}-${shape.name}-${index}`} 
+                                onClick={(e, controls) => handleShapeClick(shape, controls)}
+                                className={`${shouldHide ? 'hideShapes' : ''} ${shakingShape === shape.name ? 'shake-once' : ''}`.trim()}
                             />
                         );
                     })}

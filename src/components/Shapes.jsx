@@ -45,11 +45,12 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rota
   const [isHovered, setIsHovered] = useState(false);
   const [currentRotation, setCurrentRotation] = useState(rotation);
   const [scale, setScale] = useState(1);
+  const [isClickSpinning, setIsClickSpinning] = useState(false);
   const animationRef = useRef();
   const startTimeRef = useRef();
 
   useEffect(() => {
-    if (isHovered) {
+    if (isHovered || isClickSpinning) {
       const animate = (timestamp) => {
         if (!startTimeRef.current) {
           startTimeRef.current = timestamp;
@@ -81,7 +82,7 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rota
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isHovered]);
+  }, [isHovered, isClickSpinning]);
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -94,6 +95,18 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rota
   };
 
   const projectedVertices = shapeData.vertices.map(vertex => project(vertex, currentRotation));
+
+  const handleClick = (e) => {
+    // Immediately start spinning on any click; parent can stop if needed
+    setIsClickSpinning(true);
+    if (onClick) {
+      const controls = {
+        startPersistentSpin: () => setIsClickSpinning(true),
+        stopPersistentSpin: () => setIsClickSpinning(false)
+      };
+      onClick(e, controls);
+    }
+  };
 
   const sortedFaces = [...shapeData.faces].map((face, index) => ({
     vertices: Array.isArray(face) ? face : face.vertices || face,
@@ -116,8 +129,9 @@ const Shape3D = ({ shapeData, width = 200, height = 150, color = '#0ea5e9', rota
       style={{ transform: `scale(${scale})` }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onClick={onClick}
+      onClick={handleClick}
     >
+       <rect x="0" y="0" width={width} height={height} fill="transparent" pointerEvents="all" />
        {sortedFaces.map(({ vertices, index, showStroke = true, isEdgeFace = false }) => (
          <polygon
            key={`face-${index}`}
@@ -234,10 +248,10 @@ export const TriangularPrism = ({ onClick, className }) => {
 
   // 4 angles showing triangular cross-section clearly
   const rotations = [
-    { x: 15, y: 0 },    // front view showing triangle
-    { x: 10, y: 30 },   // angled to show triangle and depth
-    { x: 20, y: 60 },   // side angle
-    { x: 5, y: 15 }     // slight angle showing form
+    { x: 180, y: 0 },    // base down, front view showing triangle
+    { x: 180, y: 30 },   // base down, angled to show triangle and depth
+    { x: 180, y: 60 },   // base down, side angle
+    { x: 180, y: 15 }     // base down, slight angle showing form
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
@@ -392,10 +406,10 @@ export const Cone = ({ onClick, className }) => {
 
   // 4 angles showing cone form with circular base and apex
   const rotations = [
-    { x: 15, y: 20 },   // showing base circle and point
-    { x: 10, y: 40 },   // angled view of cone
-    { x: 25, y: 10 },   // side profile
-    { x: 8, y: 30 }     // clear base and apex view
+    { x: 180, y: 20 },   // base down, showing base circle and point
+    { x: 180, y: 40 },   // base down, angled view of cone
+    { x: 180, y: 10 },   // base down, side profile
+    { x: 180, y: 30 }     // base down, clear base and apex view
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
@@ -479,13 +493,32 @@ export const Pyramid = ({ onClick, className }) => {
 
   // 4 angles showing pyramid form with square base and apex
   const rotations = [
-    { x: 18, y: 30 },   // showing base and triangular faces
-    { x: 12, y: 45 },   // angled to show square base
-    { x: 25, y: 15 },   // side view showing height
-    { x: 10, y: 20 }    // clear pyramid form
+    { x: 180, y: 30 },   // base down, showing triangular faces
+    { x: 180, y: 45 },   // base down, angled to show square base
+    { x: 180, y: 15 },   // base down, side view showing height
+    { x: 180, y: 20 }    // base down, clear pyramid form
   ];
   const selectedRotation = rotations[Math.floor(Math.random() * 4)];
 
   return <Shape3D shapeData={shapeData} color="#dc2626" rotation={selectedRotation} onClick={onClick} className={className} />;
 };
 
+
+// Utility to generate a randomized set of shapes and select an answer
+export const generateShapesSet = () => {
+  const shapeLibrary = [
+    { component: Cube, name: 'cube' },
+    { component: RectangularPrism, name: 'rectangular prism' },
+    { component: TriangularPrism, name: 'triangular prism' },
+    { component: Cylinder, name: 'cylinder' },
+    { component: Cone, name: 'cone' },
+    { component: Sphere, name: 'sphere' },
+    { component: Pyramid, name: 'pyramid' }
+  ];
+
+  const shuffled = [...shapeLibrary].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, 4);
+  const answerShape = selected[Math.floor(Math.random() * selected.length)];
+
+  return { shapes: selected, answer: answerShape.name };
+};
